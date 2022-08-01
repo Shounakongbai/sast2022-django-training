@@ -19,6 +19,7 @@ def hello(req: HttpRequest):
     })
 
 # TODO: Add HTTP method check
+@method(["GET"])
 def leaderboard(req: HttpRequest):
     return JsonResponse(
         utils.get_leaderboard(),
@@ -29,16 +30,70 @@ def leaderboard(req: HttpRequest):
 @method(["GET"])
 def history(req: HttpRequest, username: str):
     # TODO: Complete `/history/<slug:username>` API
-
-    raise NotImplementedError
+    return JsonResponse(
+        utils.get_history(username),
+        safe=False
+    )
 
 
 @method(["POST"])
 @csrf_exempt
 def submit(req: HttpRequest):
     # TODO: Complete `/submit` API
-
-    raise NotImplementedError
+    info = json.loads(req.body.decode('utf8'))
+    try:
+        username = info["user"]
+        try:
+            avatar = info["avatar"]
+        except Exception:
+            avatar = None
+        content = info["content"]
+        if len(username) > 255:
+            return JsonResponse(
+                {
+                    "code": -1,
+                    "msg": "用户名太长了"
+                }
+            )
+        if avatar != None:
+            if len(avatar) > 100*1024:
+                return JsonResponse(
+                    {
+                        "code": -2,
+                        "msg": "图像太大了"
+                    }
+                )
+        try:
+            meaningless, subs = utils.judge(content)
+            subs = f"{subs[0]} {subs[1]} {subs[2]}"
+        except Exception:
+            return JsonResponse(
+                {
+                    "code": -3,
+                    "msg": "你这结果保熟吗"
+                }
+            )
+        try:
+            user = User.objects.get(username=username)
+        except Exception:
+            user = User.objects.create(username=username)
+        Submission.objects.create(user=user, avatar=avatar, score=meaningless, subs=subs)
+        return JsonResponse(
+            {
+                "code": 0,
+                "msg": "提交成功",
+                "data": {
+                    "leaderboard": utils.get_leaderboard()
+                }
+            }
+        )
+    except Exception:
+        return JsonResponse(
+            {
+                "code": 1,
+                "msg": "你这参数保熟吗"
+            }
+        )
 
 
 @method(["POST"])
@@ -51,5 +106,18 @@ def vote(req: HttpRequest):
         })
 
     # TODO: Complete `/vote` API
-
-    raise NotImplementedError
+    info = json.loads(req.body)
+    try:
+        user = User.objects.get(username=info["user"])
+    except Exception:
+        return JsonResponse({
+            "code": -1
+        })
+    user.votes = user.votes + 1
+    user.save()
+    return JsonResponse({
+        "code": 0,
+        "data": {
+            "leaderboard": utils.get_leaderboard()
+        }
+    })

@@ -1,4 +1,4 @@
-from lb.models import Submission, User
+from .models import Submission, User
 from random import randint
 import functools
 
@@ -81,6 +81,37 @@ def judge(content: str):
     #  If `content` is invalid, raise an Exception so that it can be
     #  captured in the view function.
     #  You can define the calculation of main score arbitrarily.
+    subs = [0, 0, 0]
 
-    subs = [randint(0, 100) for _ in range(3)]
-    return sum(subs), subs
+    with open("lb/ground_truth.txt") as f:
+        truth = f.read().strip().split("\n")[1:]
+    
+    truth_0 = [eval(line.split(",")[1]) for line in truth]
+    truth_1 = [eval(line.split(",")[2]) for line in truth]
+    truth_2 = [eval(line.split(",")[3]) for line in truth]
+
+    content_lines = content.strip().split("\n")
+    if len(content_lines) != len(truth_0):
+        raise AssertionError("The number of lines is wrong")
+    subs[0] = sum([(truth_0[i] == eval(content_lines[i].split(",")[0])) for i in range(len(truth_0))]) / len(truth_0)
+    subs[1] = sum([(truth_1[i] == eval(content_lines[i].split(",")[1])) for i in range(len(truth_0))]) / len(truth_0)
+    subs[2] = sum([(truth_2[i] == eval(content_lines[i].split(",")[2])) for i in range(len(truth_0))]) / len(truth_0)
+
+    return 114514, subs
+
+def get_history(username: str):
+    all_submission = Submission.objects.all()
+    submissions = [s for s in all_submission if s.user.username == username]
+
+    if len(submissions) == 0:
+        return {
+            "code": -1
+        }
+
+    return [
+        {
+            "score": s.score,
+            "subs": s.subs,
+            "time": s.time
+        } for s in submissions
+    ]
